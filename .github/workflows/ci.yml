@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore .\OneWaySyncV2.sln
+
+      - name: Build
+        run: dotnet build .\OneWaySyncV2.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test .\OneWaySyncV2.sln --configuration Release --no-build --no-restore
+
+      - name: Publish
+        if: github.event_name != 'pull_request'
+        run: dotnet publish .\src\OneWaySyncV2\OneWaySyncV2.csproj --configuration Release --runtime win-x64 --self-contained false --output .\publish\win-x64
+
+      - name: Upload artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: OneWaySyncV2-win-x64
+          path: .\publish\win-x64
