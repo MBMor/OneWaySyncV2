@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "OneWaySyncV2.Cli": {
+      "commandName": "Project",
+      "commandLineArgs": "--source \"C:\\_test\\A\" --replica \"C:\\_test\\B\" --interval-seconds 30 --log-file \"C:\\_test\\sync.log\""
+    }
+  }
+}
