@@ -32,12 +32,9 @@ try
 
     var logger = host.Services.GetRequiredService<ISyncLogger>();
     var planner = host.Services.GetRequiredService<ISyncPlanner>();
+    var executor = host.Services.GetRequiredService<ISyncExecutor>();
 
     await logger.InfoAsync("OneWaySync started.");
-    await logger.InfoAsync($"Source: {options.Source}");
-    await logger.InfoAsync($"Replica: {options.Replica}");
-    await logger.InfoAsync($"Interval: {options.IntervalSeconds} seconds");
-    await logger.InfoAsync($"Log file: {options.LogFile}");
 
     var plan = await planner.CreatePlanAsync(
         options.Source,
@@ -45,6 +42,10 @@ try
         CancellationToken.None);
 
     await logger.InfoAsync($"Sync plan created. Operations: {plan.Operations.Count}");
+
+    await executor.ExecuteAsync(plan, CancellationToken.None);
+
+    await logger.InfoAsync("Sync completed.");
 }
 catch (Exception ex) when (
     ex is ArgumentException or DirectoryNotFoundException or UnauthorizedAccessException)
