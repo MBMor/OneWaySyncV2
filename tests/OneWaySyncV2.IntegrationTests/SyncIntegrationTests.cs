@@ -2,7 +2,7 @@
 using OneWaySyncV2.Application.Sync;
 using OneWaySyncV2.Infrastructure.FileSystem;
 
-namespace OneWaySyncV2.IntegrationTests.Sync;
+namespace OneWaySyncV2.IntegrationTests;
 
 public sealed class SyncIntegrationTests
 {
@@ -44,6 +44,21 @@ public sealed class SyncIntegrationTests
 
         var content = await File.ReadAllTextAsync(replicaFile);
         content.Should().Be("new");
+    }
+
+    [Fact]
+    public async Task Sync_WhenSourceContainsEmptyDirectory_CreatesItInReplica()
+    {
+        using var source = new TemporaryDirectory();
+        using var replica = new TemporaryDirectory();
+
+        Directory.CreateDirectory(Path.Combine(source.Path, "empty"));
+
+        await RunSingleSyncAsync(source.Path, replica.Path);
+
+        Directory.Exists(Path.Combine(replica.Path, "empty"))
+            .Should()
+            .BeTrue();
     }
 
     [Fact]

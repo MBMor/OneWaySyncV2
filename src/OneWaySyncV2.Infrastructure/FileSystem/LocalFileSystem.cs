@@ -14,6 +14,30 @@ public sealed class LocalFileSystem : IFileSystem
         Directory.CreateDirectory(path);
     }
 
+    public Task<IReadOnlyCollection<DirectoryItem>> GetDirectoriesAsync(
+    string rootPath,
+    CancellationToken cancellationToken)
+    {
+        if (!Directory.Exists(rootPath))
+            return Task.FromResult<IReadOnlyCollection<DirectoryItem>>([]);
+
+        var directories = new List<DirectoryItem>();
+
+        foreach (var directoryPath in Directory.EnumerateDirectories(
+                     rootPath,
+                     "*",
+                     SearchOption.AllDirectories))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            directories.Add(new DirectoryItem(
+                FullPath: directoryPath,
+                RelativePath: Path.GetRelativePath(rootPath, directoryPath)));
+        }
+
+        return Task.FromResult<IReadOnlyCollection<DirectoryItem>>(directories);
+    }
+
     public async Task<IReadOnlyCollection<FileItem>> GetFilesAsync(
         string rootPath,
         CancellationToken cancellationToken)
@@ -50,23 +74,26 @@ public sealed class LocalFileSystem : IFileSystem
         if (!string.IsNullOrWhiteSpace(destinationDirectory))
             Directory.CreateDirectory(destinationDirectory);
 
-        await using var sourceStream = new FileStream(
+        await using (var sourceStream = new FileStream(
             sourcePath,
             FileMode.Open,
             FileAccess.Read,
             FileShare.Read,
             bufferSize: 81920,
-            options: FileOptions.Asynchronous | FileOptions.SequentialScan);
-
-        await using var destinationStream = new FileStream(
+            options: FileOptions.Asynchronous | FileOptions.SequentialScan))
+        await using (var destinationStream = new FileStream(
             destinationPath,
             overwrite ? FileMode.Create : FileMode.CreateNew,
             FileAccess.Write,
             FileShare.None,
             bufferSize: 81920,
-            options: FileOptions.Asynchronous | FileOptions.SequentialScan);
+            options: FileOptions.Asynchronous | FileOptions.SequentialScan))
+        {
+            await sourceStream.CopyToAsync(destinationStream, cancellationToken);
+        }
 
-        await sourceStream.CopyToAsync(destinationStream, cancellationToken);
+        var lastWrite = File.GetLastWriteTimeUtc(sourcePath);
+        File.SetLastWriteTimeUtc(destinationPath, lastWrite);
     }
 
     public void DeleteFile(string path)

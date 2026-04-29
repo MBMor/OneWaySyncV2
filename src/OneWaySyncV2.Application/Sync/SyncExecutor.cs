@@ -47,6 +47,16 @@ public sealed class SyncExecutor(
                 await DeleteAsync(operation, cancellationToken);
                 break;
 
+            case SyncOperationType.CreateDirectory:
+                await CreateDirectoryAsync(operation, cancellationToken);
+                break;
+
+            case SyncOperationType.DeleteDirectory:
+                await DeleteDirectoryAsync(operation, cancellationToken);
+                break;
+
+
+
             default:
                 throw new InvalidOperationException(
                     $"Unsupported sync operation type: {operation.Type}");
@@ -86,6 +96,34 @@ public sealed class SyncExecutor(
 
         await logger.InfoAsync(
             $"Delete: {operation.RelativePath}",
+            cancellationToken);
+    }
+
+    private async Task CreateDirectoryAsync(
+    SyncOperation operation,
+    CancellationToken cancellationToken)
+    {
+        if (operation.ReplicaPath is null)
+            throw new InvalidOperationException("Replica path is required for create directory operation.");
+
+        fileSystem.CreateDirectory(operation.ReplicaPath);
+
+        await logger.InfoAsync(
+            $"CreateDirectory: {operation.RelativePath}",
+            cancellationToken);
+    }
+
+    private async Task DeleteDirectoryAsync(
+        SyncOperation operation,
+        CancellationToken cancellationToken)
+    {
+        if (operation.ReplicaPath is null)
+            throw new InvalidOperationException("Replica path is required for delete directory operation.");
+
+        fileSystem.DeleteDirectory(operation.ReplicaPath);
+
+        await logger.InfoAsync(
+            $"DeleteDirectory: {operation.RelativePath}",
             cancellationToken);
     }
 }

@@ -1,7 +1,6 @@
 ﻿using OneWaySyncV2.Application.Abstractions;
+using OneWaySyncV2.Application.Sync;
 using OneWaySyncV2.Domain.Sync;
-
-namespace OneWaySyncV2.Application.Sync;
 
 public sealed class SyncPlanner(IFileSystem fileSystem) : ISyncPlanner
 {
@@ -10,65 +9,165 @@ public sealed class SyncPlanner(IFileSystem fileSystem) : ISyncPlanner
         string replicaPath,
         CancellationToken cancellationToken)
     {
-        var sourceFiles = await fileSystem.GetFilesAsync(sourcePath, cancellationToken);
-        var replicaFiles = fileSystem.DirectoryExists(replicaPath)
-            ? await fileSystem.GetFilesAsync(replicaPath, cancellationToken)
+        var sourceDirectories = await GetDirectoriesByRelativePathAsync(sourcePath, cancellationToken);
+        var replicaDirectories = fileSystem.DirectoryExists(replicaPath)
+            ? await GetDirectoriesByRelativePathAsync(replicaPath, cancellationToken)
             : [];
 
-        var sourceByRelativePath = sourceFiles.ToDictionary(
-            file => NormalizeRelativePath(file.RelativePath),
-            StringComparer.OrdinalIgnoreCase);
-
-        var replicaByRelativePath = replicaFiles.ToDictionary(
-            file => NormalizeRelativePath(file.RelativePath),
-            StringComparer.OrdinalIgnoreCase);
+        var sourceFiles = await GetFilesByRelativePathAsync(sourcePath, cancellationToken);
+        var replicaFiles = fileSystem.DirectoryExists(replicaPath)
+            ? await GetFilesByRelativePathAsync(replicaPath, cancellationToken)
+            : [];
 
         var operations = new List<SyncOperation>();
 
-        foreach (var sourceFile in sourceByRelativePath.Values)
+        AddCreateDirectoryOperations(
+            operations,
+            sourceDirectories,
+            replicaDirectories,
+            replicaPath,
+            cancellationToken);
+
+        AddCreateAndUpdateFileOperations(
+            operations,
+            sourceFiles,
+            replicaFiles,
+            replicaPath,
+            cancellationToken);
+
+        AddDeleteFileOperations(
+            operations,
+            sourceFiles,
+            replicaFiles,
+            cancellationToken);
+
+        AddDeleteDirectoryOperations(
+            operations,
+            sourceDirectories,
+            replicaDirectories,
+            cancellationToken);
+
+        return new SyncPlan(operations);
+    }
+
+    private async Task<Dictionary<string, DirectoryItem>> GetDirectoriesByRelativePathAsync(
+        string rootPath,
+        CancellationToken cancellationToken)
+    {
+        var directories = await fileSystem.GetDirectoriesAsync(rootPath, cancellationToken);
+
+        return directories.ToDictionary(
+            directory => NormalizeRelativePath(directory.RelativePath),
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    private async Task<Dictionary<string, FileItem>> GetFilesByRelativePathAsync(
+        string rootPath,
+        CancellationToken cancellationToken)
+    {
+        var files = await fileSystem.GetFilesAsync(rootPath, cancellationToken);
+
+        return files.ToDictionary(
+            file => NormalizeRelativePath(file.RelativePath),
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static void AddCreateDirectoryOperations(
+        ICollection<SyncOperation> operations,
+        IReadOnlyDictionary<string, DirectoryItem> sourceDirectories,
+        IReadOnlyDictionary<string, DirectoryItem> replicaDirectories,
+        string replicaPath,
+        CancellationToken cancellationToken)
+    {
+        foreach (var (relativePath, sourceDirectory) in sourceDirectories)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var relativePath = NormalizeRelativePath(sourceFile.RelativePath);
+            if (replicaDirectories.ContainsKey(relativePath))
+                continue;
 
-            if (!replicaByRelativePath.TryGetValue(relativePath, out var replicaFile))
+            operations.Add(new SyncOperation(
+                SyncOperationType.CreateDirectory,
+                relativePath,
+                SourcePath: sourceDirectory.FullPath,
+                ReplicaPath: Path.Combine(replicaPath, relativePath)));
+        }
+    }
+
+    private static void AddCreateAndUpdateFileOperations(
+        ICollection<SyncOperation> operations,
+        IReadOnlyDictionary<string, FileItem> sourceFiles,
+        IReadOnlyDictionary<string, FileItem> replicaFiles,
+        string replicaPath,
+        CancellationToken cancellationToken)
+    {
+        foreach (var (relativePath, sourceFile) in sourceFiles)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (!replicaFiles.TryGetValue(relativePath, out var replicaFile))
             {
                 operations.Add(new SyncOperation(
                     SyncOperationType.Create,
                     relativePath,
-                    sourceFile.FullPath,
-                    Path.Combine(replicaPath, relativePath)));
+                    SourcePath: sourceFile.FullPath,
+                    ReplicaPath: Path.Combine(replicaPath, relativePath)));
 
                 continue;
             }
 
-            if (NeedsUpdate(sourceFile.Metadata, replicaFile.Metadata))
-            {
-                operations.Add(new SyncOperation(
-                    SyncOperationType.Update,
-                    relativePath,
-                    sourceFile.FullPath,
-                    replicaFile.FullPath));
-            }
-        }
+            if (!NeedsUpdate(sourceFile.Metadata, replicaFile.Metadata))
+                continue;
 
-        foreach (var replicaFile in replicaByRelativePath.Values)
+            operations.Add(new SyncOperation(
+                SyncOperationType.Update,
+                relativePath,
+                SourcePath: sourceFile.FullPath,
+                ReplicaPath: replicaFile.FullPath));
+        }
+    }
+
+    private static void AddDeleteFileOperations(
+        ICollection<SyncOperation> operations,
+        IReadOnlyDictionary<string, FileItem> sourceFiles,
+        IReadOnlyDictionary<string, FileItem> replicaFiles,
+        CancellationToken cancellationToken)
+    {
+        foreach (var (relativePath, replicaFile) in replicaFiles)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var relativePath = NormalizeRelativePath(replicaFile.RelativePath);
+            if (sourceFiles.ContainsKey(relativePath))
+                continue;
 
-            if (!sourceByRelativePath.ContainsKey(relativePath))
-            {
-                operations.Add(new SyncOperation(
-                    SyncOperationType.Delete,
-                    relativePath,
-                    SourcePath: null,
-                    replicaFile.FullPath));
-            }
+            operations.Add(new SyncOperation(
+                SyncOperationType.Delete,
+                relativePath,
+                SourcePath: null,
+                ReplicaPath: replicaFile.FullPath));
         }
+    }
 
-        return new SyncPlan(operations);
+    private static void AddDeleteDirectoryOperations(
+        ICollection<SyncOperation> operations,
+        IReadOnlyDictionary<string, DirectoryItem> sourceDirectories,
+        IReadOnlyDictionary<string, DirectoryItem> replicaDirectories,
+        CancellationToken cancellationToken)
+    {
+        foreach (var (relativePath, replicaDirectory) in replicaDirectories
+                     .OrderByDescending(x => x.Key.Length))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (sourceDirectories.ContainsKey(relativePath))
+                continue;
+
+            operations.Add(new SyncOperation(
+                SyncOperationType.DeleteDirectory,
+                relativePath,
+                SourcePath: null,
+                ReplicaPath: replicaDirectory.FullPath));
+        }
     }
 
     private static bool NeedsUpdate(

@@ -16,6 +16,13 @@ internal sealed class RecordingFileSystem : IFileSystem
     {
     }
 
+    public Task<IReadOnlyCollection<DirectoryItem>> GetDirectoriesAsync(
+    string rootPath,
+    CancellationToken cancellationToken)
+    {
+        return Task.FromResult<IReadOnlyCollection<DirectoryItem>>([]);
+    }
+
     public Task<IReadOnlyCollection<FileItem>> GetFilesAsync(
         string rootPath,
         CancellationToken cancellationToken)

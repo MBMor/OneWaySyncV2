@@ -5,6 +5,9 @@ public interface IFileSystem
     bool DirectoryExists(string path);
 
     void CreateDirectory(string path);
+    Task<IReadOnlyCollection<DirectoryItem>> GetDirectoriesAsync(
+    string rootPath,
+    CancellationToken cancellationToken);
 
     Task<IReadOnlyCollection<FileItem>> GetFilesAsync(
         string rootPath,

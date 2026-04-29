@@ -132,7 +132,7 @@ public sealed class SyncPlannerTests
     }
 
     [Fact]
-    public async Task CreatePlanAsync_WhenNestedFileIsMissing_ReturnsCreateOperation()
+    public async Task CreatePlanAsync_WhenNestedFileIsMissing_ReturnsCreateDirectoryAndCreateFileOperations()
     {
         var fileSystem = new InMemoryFileSystem(
             sourceFiles:
@@ -148,10 +148,15 @@ public sealed class SyncPlannerTests
             "/replica",
             CancellationToken.None);
 
-        var operation = plan.Operations.Should().ContainSingle().Subject;
+        plan.Operations.Should().HaveCount(2);
 
-        operation.Type.Should().Be(SyncOperationType.Create);
-        operation.RelativePath.Should().Be(Path.Combine("folder", "a.txt"));
+        plan.Operations.Should().Contain(operation =>
+            operation.Type == SyncOperationType.CreateDirectory
+            && operation.RelativePath == "folder");
+
+        plan.Operations.Should().Contain(operation =>
+            operation.Type == SyncOperationType.Create
+            && operation.RelativePath == Path.Combine("folder", "a.txt"));
     }
 
     private static FileItem File(string relativePath, long length)

@@ -12,6 +12,26 @@ internal sealed class InMemoryFileSystem(
     {
     }
 
+    public Task<IReadOnlyCollection<DirectoryItem>> GetDirectoriesAsync(
+    string rootPath,
+    CancellationToken cancellationToken)
+    {
+        var files = rootPath.Contains("source", StringComparison.OrdinalIgnoreCase)
+            ? sourceFiles
+            : replicaFiles;
+
+        var directories = files
+            .Select(f => Path.GetDirectoryName(f.RelativePath))
+            .Where(d => !string.IsNullOrWhiteSpace(d))
+            .Distinct()
+            .Select(d => new DirectoryItem(
+                FullPath: d!,
+                RelativePath: d!))
+            .ToList();
+
+        return Task.FromResult<IReadOnlyCollection<DirectoryItem>>(directories);
+    }
+
     public Task<IReadOnlyCollection<FileItem>> GetFilesAsync(
         string rootPath,
         CancellationToken cancellationToken)
