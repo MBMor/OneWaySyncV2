@@ -15,6 +15,7 @@ public static class DependencyInjection
         services.AddSingleton<ISyncLogger, SyncLogger>();
 
         services.AddSingleton<IFileSystem, LocalFileSystem>();
+        services.AddSingleton<IFileHasher, Sha256FileHasher>();
 
         return services;
     }

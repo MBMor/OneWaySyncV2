@@ -14,11 +14,13 @@ public sealed class SyncPlannerTests
         var fileSystem = new InMemoryFileSystem(
             sourceFiles:
             [
-                File("a.txt", 10)
+                SourceFile("a.txt", 10)
             ],
             replicaFiles: []);
 
-        var planner = new SyncPlanner(fileSystem);
+        var planner = new SyncPlanner(
+            fileSystem,
+            new InMemoryFileHasher(new Dictionary<string, string>()));
 
         var plan = await planner.CreatePlanAsync(
             "/source",
@@ -37,14 +39,16 @@ public sealed class SyncPlannerTests
         var fileSystem = new InMemoryFileSystem(
             sourceFiles:
             [
-                File("a.txt", 20)
+                SourceFile("a.txt", 20)
             ],
             replicaFiles:
             [
-                File("a.txt", 10)
+                ReplicaFile("a.txt", 10)
             ]);
 
-        var planner = new SyncPlanner(fileSystem);
+        var planner = new SyncPlanner(
+            fileSystem,
+            new InMemoryFileHasher(new Dictionary<string, string>()));
 
         var plan = await planner.CreatePlanAsync(
             "/source",
@@ -64,10 +68,12 @@ public sealed class SyncPlannerTests
             sourceFiles: [],
             replicaFiles:
             [
-                File("old.txt", 10)
+                SourceFile("old.txt", 10)
             ]);
 
-        var planner = new SyncPlanner(fileSystem);
+        var planner = new SyncPlanner(
+            fileSystem,
+            new InMemoryFileHasher(new Dictionary<string, string>()));
 
         var plan = await planner.CreatePlanAsync(
             "/source",
@@ -88,14 +94,16 @@ public sealed class SyncPlannerTests
         var fileSystem = new InMemoryFileSystem(
             sourceFiles:
             [
-                File("a.txt", 10, lastWrite)
+                SourceFile("a.txt", 10, lastWrite)
             ],
             replicaFiles:
             [
-                File("a.txt", 10, lastWrite)
+                ReplicaFile("a.txt", 10, lastWrite)
             ]);
 
-        var planner = new SyncPlanner(fileSystem);
+        var planner = new SyncPlanner(
+            fileSystem,
+            new InMemoryFileHasher(new Dictionary<string, string>()));
 
         var plan = await planner.CreatePlanAsync(
             "/source",
@@ -106,19 +114,54 @@ public sealed class SyncPlannerTests
     }
 
     [Fact]
-    public async Task CreatePlanAsync_WhenTimestampDiffers_ReturnsUpdateOperation()
+    public async Task CreatePlanAsync_WhenTimestampDiffersButHashIsSame_ReturnsNoOperations()
     {
-        var fileSystem = new InMemoryFileSystem(
-            sourceFiles:
-            [
-                File("a.txt", 10, DateTimeOffset.UtcNow)
-            ],
-            replicaFiles:
-            [
-                File("a.txt", 10, DateTimeOffset.UtcNow.AddMinutes(-5))
-            ]);
+        var sourceTime = DateTimeOffset.UtcNow;
+        var replicaTime = sourceTime.AddMinutes(-5);
 
-        var planner = new SyncPlanner(fileSystem);
+        var sourceFile = SourceFile("a.txt", 10, sourceTime);
+        var replicaFile = ReplicaFile("a.txt", 10, replicaTime);
+
+        var fileSystem = new InMemoryFileSystem(
+            sourceFiles: [sourceFile],
+            replicaFiles: [replicaFile]);
+
+        var fileHasher = new InMemoryFileHasher(new Dictionary<string, string>
+        {
+            [sourceFile.FullPath] = "ABC",
+            [replicaFile.FullPath] = "ABC"
+        });
+
+        var planner = new SyncPlanner(fileSystem, fileHasher);
+
+        var plan = await planner.CreatePlanAsync(
+            "/source",
+            "/replica",
+            CancellationToken.None);
+
+        plan.Operations.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task CreatePlanAsync_WhenTimestampDiffersAndHashDiffers_ReturnsUpdateOperation()
+    {
+        var sourceTime = DateTimeOffset.UtcNow;
+        var replicaTime = sourceTime.AddMinutes(-5);
+
+        var sourceFile = SourceFile("a.txt", 10, sourceTime);
+        var replicaFile = ReplicaFile("a.txt", 10, replicaTime);
+
+        var fileSystem = new InMemoryFileSystem(
+            sourceFiles: [sourceFile],
+            replicaFiles: [replicaFile]);
+
+        var fileHasher = new InMemoryFileHasher(new Dictionary<string, string>
+        {
+            [sourceFile.FullPath] = "ABC",
+            [replicaFile.FullPath] = "DEF"
+        });
+
+        var planner = new SyncPlanner(fileSystem, fileHasher);
 
         var plan = await planner.CreatePlanAsync(
             "/source",
@@ -137,11 +180,13 @@ public sealed class SyncPlannerTests
         var fileSystem = new InMemoryFileSystem(
             sourceFiles:
             [
-                File(Path.Combine("folder", "a.txt"), 10, DateTimeOffset.UtcNow)
+                SourceFile(Path.Combine("folder", "a.txt"), 10, DateTimeOffset.UtcNow)
             ],
             replicaFiles: []);
 
-        var planner = new SyncPlanner(fileSystem);
+        var planner = new SyncPlanner(
+            fileSystem,
+            new InMemoryFileHasher(new Dictionary<string, string>()));
 
         var plan = await planner.CreatePlanAsync(
             "/source",
@@ -159,18 +204,36 @@ public sealed class SyncPlannerTests
             && operation.RelativePath == Path.Combine("folder", "a.txt"));
     }
 
-    private static FileItem File(string relativePath, long length)
+    private static FileItem SourceFile(string relativePath, long length)
     {
-        return File(relativePath, length, DateTimeOffset.UtcNow);
+        return SourceFile(relativePath, length, DateTimeOffset.UtcNow);
     }
 
-    private static FileItem File(
+    private static FileItem SourceFile(
         string relativePath,
         long length,
         DateTimeOffset lastWriteTimeUtc)
     {
         return new FileItem(
-            FullPath: relativePath,
+            FullPath: Path.Combine("/source", relativePath),
+            RelativePath: relativePath,
+            Metadata: new FileMetadata(
+                Length: length,
+                LastWriteTimeUtc: lastWriteTimeUtc));
+    }
+
+    private static FileItem ReplicaFile(string relativePath, long length)
+    {
+        return ReplicaFile(relativePath, length, DateTimeOffset.UtcNow);
+    }
+
+    private static FileItem ReplicaFile(
+        string relativePath,
+        long length,
+        DateTimeOffset lastWriteTimeUtc)
+    {
+        return new FileItem(
+            FullPath: Path.Combine("/replica", relativePath),
             RelativePath: relativePath,
             Metadata: new FileMetadata(
                 Length: length,

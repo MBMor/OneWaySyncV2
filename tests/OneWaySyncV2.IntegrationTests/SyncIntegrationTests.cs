@@ -171,7 +171,10 @@ public sealed class SyncIntegrationTests
 
         fileSystem.CreateDirectory(replicaPath);
 
-        var planner = new SyncPlanner(fileSystem);
+        var planner = new SyncPlanner(
+            fileSystem,
+            new Sha256FileHasher());
+
         var executor = new SyncExecutor(fileSystem, logger);
 
         var plan = await planner.CreatePlanAsync(

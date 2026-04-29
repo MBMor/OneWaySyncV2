@@ -2,7 +2,9 @@
 using OneWaySyncV2.Application.Sync;
 using OneWaySyncV2.Domain.Sync;
 
-public sealed class SyncPlanner(IFileSystem fileSystem) : ISyncPlanner
+public sealed class SyncPlanner(
+    IFileSystem fileSystem,
+    IFileHasher fileHasher) : ISyncPlanner
 {
     public async Task<SyncPlan> CreatePlanAsync(
         string sourcePath,
@@ -28,7 +30,7 @@ public sealed class SyncPlanner(IFileSystem fileSystem) : ISyncPlanner
             replicaPath,
             cancellationToken);
 
-        AddCreateAndUpdateFileOperations(
+        await AddCreateAndUpdateFileOperationsAsync(
             operations,
             sourceFiles,
             replicaFiles,
@@ -94,7 +96,7 @@ public sealed class SyncPlanner(IFileSystem fileSystem) : ISyncPlanner
         }
     }
 
-    private static void AddCreateAndUpdateFileOperations(
+    private async Task AddCreateAndUpdateFileOperationsAsync(
         ICollection<SyncOperation> operations,
         IReadOnlyDictionary<string, FileItem> sourceFiles,
         IReadOnlyDictionary<string, FileItem> replicaFiles,
@@ -116,7 +118,7 @@ public sealed class SyncPlanner(IFileSystem fileSystem) : ISyncPlanner
                 continue;
             }
 
-            if (!NeedsUpdate(sourceFile.Metadata, replicaFile.Metadata))
+            if (!await NeedsUpdateAsync(sourceFile, replicaFile, cancellationToken))
                 continue;
 
             operations.Add(new SyncOperation(
@@ -170,12 +172,26 @@ public sealed class SyncPlanner(IFileSystem fileSystem) : ISyncPlanner
         }
     }
 
-    private static bool NeedsUpdate(
-        FileMetadata source,
-        FileMetadata replica)
+    private async Task<bool> NeedsUpdateAsync(
+        FileItem source,
+        FileItem replica,
+        CancellationToken cancellationToken)
     {
-        return source.Length != replica.Length
-               || source.LastWriteTimeUtc != replica.LastWriteTimeUtc;
+        if (source.Metadata.Length != replica.Metadata.Length)
+            return true;
+
+        if (source.Metadata.LastWriteTimeUtc == replica.Metadata.LastWriteTimeUtc)
+            return false;
+
+        var sourceHash = await fileHasher.ComputeHashAsync(
+            source.FullPath,
+            cancellationToken);
+
+        var replicaHash = await fileHasher.ComputeHashAsync(
+            replica.FullPath,
+            cancellationToken);
+
+        return sourceHash != replicaHash;
     }
 
     private static string NormalizeRelativePath(string relativePath)
