@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OneWaySyncV2.Application", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OneWaySyncV2.UnitTests", "tests\OneWaySyncV2.UnitTests\OneWaySyncV2.UnitTests.csproj", "{44127D5A-5F91-EA3C-BCD4-7B8EA5264D20}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OneWaySyncV2.IntegrationTests", "tests\OneWaySyncV2.IntegrationTests\OneWaySyncV2.IntegrationTests.csproj", "{98759D15-3654-0162-9EEB-0830A42BD855}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -87,6 +89,18 @@ Global
 		{44127D5A-5F91-EA3C-BCD4-7B8EA5264D20}.Release|x64.Build.0 = Release|Any CPU
 		{44127D5A-5F91-EA3C-BCD4-7B8EA5264D20}.Release|x86.ActiveCfg = Release|Any CPU
 		{44127D5A-5F91-EA3C-BCD4-7B8EA5264D20}.Release|x86.Build.0 = Release|Any CPU
+		{98759D15-3654-0162-9EEB-0830A42BD855}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{98759D15-3654-0162-9EEB-0830A42BD855}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{98759D15-3654-0162-9EEB-0830A42BD855}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{98759D15-3654-0162-9EEB-0830A42BD855}.Debug|x64.Build.0 = Debug|Any CPU
+		{98759D15-3654-0162-9EEB-0830A42BD855}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{98759D15-3654-0162-9EEB-0830A42BD855}.Debug|x86.Build.0 = Debug|Any CPU
+		{98759D15-3654-0162-9EEB-0830A42BD855}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{98759D15-3654-0162-9EEB-0830A42BD855}.Release|Any CPU.Build.0 = Release|Any CPU
+		{98759D15-3654-0162-9EEB-0830A42BD855}.Release|x64.ActiveCfg = Release|Any CPU
+		{98759D15-3654-0162-9EEB-0830A42BD855}.Release|x64.Build.0 = Release|Any CPU
+		{98759D15-3654-0162-9EEB-0830A42BD855}.Release|x86.ActiveCfg = Release|Any CPU
+		{98759D15-3654-0162-9EEB-0830A42BD855}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
