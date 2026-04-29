@@ -13,6 +13,14 @@ try
 {
     var cliOptions = OptionsParser.Parse(args);
 
+    using var cancellationTokenSource = new CancellationTokenSource();
+
+    Console.CancelKeyPress += (_, eventArgs) =>
+    {
+        eventArgs.Cancel = true;
+        cancellationTokenSource.Cancel();
+    };
+
     using var host = Host.CreateDefaultBuilder(args)
         .ConfigureLogging(logging =>
         {
@@ -33,14 +41,23 @@ try
     var logger = host.Services.GetRequiredService<ISyncLogger>();
     var runner = host.Services.GetRequiredService<ISyncRunner>();
 
-    await logger.InfoAsync("OneWaySync started.");
+    await logger.InfoAsync("OneWaySync started. Press Ctrl+C to stop.");
 
-    await runner.RunAsync(
-        new SyncOptions(
-            Source: cliOptions.Source,
-            Replica: cliOptions.Replica,
-            Interval: TimeSpan.FromSeconds(cliOptions.IntervalSeconds)),
-        CancellationToken.None);
+    try
+    {
+        await runner.RunAsync(
+            new SyncOptions(
+                Source: cliOptions.Source,
+                Replica: cliOptions.Replica,
+                Interval: TimeSpan.FromSeconds(cliOptions.IntervalSeconds)),
+            cancellationTokenSource.Token);
+    }
+    catch (OperationCanceledException)
+    {
+        await logger.InfoAsync("Shutdown requested.");
+    }
+
+    await logger.InfoAsync("OneWaySync stopped.");
 }
 catch (Exception ex) when (
     ex is ArgumentException or DirectoryNotFoundException or UnauthorizedAccessException)
