@@ -9,6 +9,7 @@ public static class DependencyInjection
     {
         services.AddSingleton<ISyncPlanner, SyncPlanner>();
         services.AddSingleton<ISyncExecutor, SyncExecutor>();
+        services.AddSingleton<ISyncRunner, SyncRunner>();
 
         return services;
     }

@@ -11,7 +11,7 @@ using OneWaySyncV2.Infrastructure;
 
 try
 {
-    var options = OptionsParser.Parse(args);
+    var cliOptions = OptionsParser.Parse(args);
 
     using var host = Host.CreateDefaultBuilder(args)
         .ConfigureLogging(logging =>
@@ -26,26 +26,21 @@ try
         .ConfigureServices(services =>
         {
             services.AddApplication();
-            services.AddInfrastructure(options.LogFile);
+            services.AddInfrastructure(cliOptions.LogFile);
         })
         .Build();
 
     var logger = host.Services.GetRequiredService<ISyncLogger>();
-    var planner = host.Services.GetRequiredService<ISyncPlanner>();
-    var executor = host.Services.GetRequiredService<ISyncExecutor>();
+    var runner = host.Services.GetRequiredService<ISyncRunner>();
 
     await logger.InfoAsync("OneWaySync started.");
 
-    var plan = await planner.CreatePlanAsync(
-        options.Source,
-        options.Replica,
+    await runner.RunAsync(
+        new SyncOptions(
+            Source: cliOptions.Source,
+            Replica: cliOptions.Replica,
+            Interval: TimeSpan.FromSeconds(cliOptions.IntervalSeconds)),
         CancellationToken.None);
-
-    await logger.InfoAsync($"Sync plan created. Operations: {plan.Operations.Count}");
-
-    await executor.ExecuteAsync(plan, CancellationToken.None);
-
-    await logger.InfoAsync("Sync completed.");
 }
 catch (Exception ex) when (
     ex is ArgumentException or DirectoryNotFoundException or UnauthorizedAccessException)

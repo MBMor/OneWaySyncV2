@@ -1,6 +1,6 @@
 ﻿namespace OneWaySyncV2.Cli.Options;
 
-public sealed record SyncOptions(
+public sealed record CliOptions(
     string Source,
     string Replica,
     int IntervalSeconds,

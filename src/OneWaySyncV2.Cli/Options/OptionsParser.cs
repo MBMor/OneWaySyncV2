@@ -2,7 +2,7 @@
 
 public static class OptionsParser
 {
-    public static SyncOptions Parse(string[] args)
+    public static CliOptions Parse(string[] args)
     {
         var values = ParseKeyValueArgs(args);
 
@@ -20,7 +20,7 @@ public static class OptionsParser
 
         ValidatePaths(fullSource, fullReplica, fullLogFile);
 
-        return new SyncOptions(
+        return new CliOptions(
             Source: fullSource,
             Replica: fullReplica,
             IntervalSeconds: intervalSeconds,
