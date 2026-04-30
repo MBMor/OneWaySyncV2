@@ -1,4 +1,5 @@
-﻿using OneWaySyncV2.Application.Abstractions;
+﻿using FluentAssertions;
+using OneWaySyncV2.Application.Abstractions;
 using OneWaySyncV2.Cli.Options;
 using OneWaySyncV2.UnitTests.Helpers;
 
@@ -54,16 +55,41 @@ public sealed class OptionsParserTests
         Assert.Throws<ArgumentException>(() => OptionsParser.Parse(args));
     }
 
-    private static FileItem File(
-    string relativePath,
-    long length,
-    DateTimeOffset lastWriteTimeUtc)
+    [Theory]
+    [InlineData("--help")]
+    [InlineData("-h")]
+    [InlineData("--HELP")]
+    public void IsHelpRequested_WhenHelpArgumentIsPresent_ReturnsTrue(string helpArgument)
     {
-        return new FileItem(
-            FullPath: relativePath,
-            RelativePath: relativePath,
-            Metadata: new FileMetadata(
-                Length: length,
-                LastWriteTimeUtc: lastWriteTimeUtc));
+        var result = OptionsParser.IsHelpRequested([helpArgument]);
+
+        result.Should().BeTrue();
+    }
+
+    [Fact]
+    public void IsHelpRequested_WhenHelpArgumentIsMissing_ReturnsFalse()
+    {
+        var result = OptionsParser.IsHelpRequested([
+            "--source", "/source",
+        "--replica", "/replica",
+        "--interval-seconds", "10",
+        "--log-file", "/logs/sync.log"
+        ]);
+
+        result.Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsHelpRequested_WhenHelpIsMixedWithOtherArguments_ReturnsTrue()
+    {
+        var result = OptionsParser.IsHelpRequested([
+            "--source", "/source",
+        "--replica", "/replica",
+        "--interval-seconds", "10",
+        "--log-file", "/logs/sync.log",
+        "--help"
+        ]);
+
+        result.Should().BeTrue();
     }
 }

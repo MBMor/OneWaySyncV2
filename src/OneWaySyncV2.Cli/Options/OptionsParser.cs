@@ -2,6 +2,12 @@
 
 public static class OptionsParser
 {
+    public static bool IsHelpRequested(string[] args)
+    {
+        return args.Any(arg =>
+            string.Equals(arg, "--help", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(arg, "-h", StringComparison.OrdinalIgnoreCase));
+    }
     public static CliOptions Parse(string[] args)
     {
         var values = ParseKeyValueArgs(args);

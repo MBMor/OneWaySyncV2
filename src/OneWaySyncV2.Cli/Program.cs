@@ -4,10 +4,17 @@ using Microsoft.Extensions.Logging;
 using OneWaySyncV2.Application;
 using OneWaySyncV2.Application.Abstractions;
 using OneWaySyncV2.Application.Sync;
+using OneWaySyncV2.Cli;
 using OneWaySyncV2.Cli.Options;
 using OneWaySyncV2.Infrastructure;
 
 //--source "C:\_test\A"--replica "C:\_test\B" --interval-seconds 30 --log-file "C:\_test\sync.log"
+
+if (OptionsParser.IsHelpRequested(args))
+{
+    CliUsage.Write(Console.Out);
+    return CliExitCodes.Success;
+}
 
 try
 {
@@ -67,7 +74,7 @@ catch (Exception ex) when (
     Console.Error.WriteLine("Usage:");
     Console.Error.WriteLine("  OneWaySyncV2.Cli --source <path> --replica <path> --interval-seconds <seconds> --log-file <path>");
 
-    return 1;
+    return CliExitCodes.InvalidArguments;
 }
 
-return 0;
+return CliExitCodes.Success;
