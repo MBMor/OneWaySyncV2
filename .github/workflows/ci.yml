@@ -39,8 +39,11 @@ jobs:
       - name: Build
         run: dotnet build .\OneWaySyncV2.sln --configuration Release --no-restore
 
-      - name: Test
-        run: dotnet test .\OneWaySyncV2.sln --configuration Release --no-build --no-restore --logger "trx;LogFileName=test-results.trx" --results-directory .\TestResults
+      - name: Unit tests
+        run: dotnet test .\tests\OneWaySyncV2.UnitTests\OneWaySyncV2.UnitTests.csproj --configuration Release --no-build --no-restore --logger "trx;LogFileName=unit-tests.trx" --results-directory .\TestResults
+
+      - name: Integration tests
+        run: dotnet test .\tests\OneWaySyncV2.IntegrationTests\OneWaySyncV2.IntegrationTests.csproj --configuration Release --no-build --no-restore --logger "trx;LogFileName=integration-tests.trx" --results-directory .\TestResults
 
       - name: Upload test results
         if: always()
