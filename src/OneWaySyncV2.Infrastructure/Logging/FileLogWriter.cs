@@ -41,8 +41,19 @@ public sealed class FileLogWriter(string logFilePath) : ILogWriter
     {
         var timestamp = DateTimeOffset.Now.ToString("O");
 
-        return exception is null
-            ? $"[{timestamp}] [{level}] {message}"
-            : $"[{timestamp}] [{level}] {message} | {exception}";
+        if (exception is null)
+            return $"[{timestamp}] [{level}] {message}";
+
+        return $"[{timestamp}] [{level}] {message} Reason: {GetUserFriendlyError(exception)}";
+    }
+
+    private static string GetUserFriendlyError(Exception exception)
+    {
+        return exception switch
+        {
+            IOException => exception.Message,
+            UnauthorizedAccessException => exception.Message,
+            _ => $"{exception.GetType().Name}: {exception.Message}"
+        };
     }
 }

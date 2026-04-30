@@ -36,12 +36,26 @@ public sealed class SyncLogger(
         Exception? exception = null,
         CancellationToken cancellationToken = default)
     {
-        consoleLogger.LogError(exception, "{Message}", message);
+        var consoleMessage = exception is null
+            ? message
+            : $"{message} Reason: {GetUserFriendlyError(exception)}";
+
+        consoleLogger.LogError("{Message}", consoleMessage);
 
         await fileLogWriter.WriteAsync(
             OneWaySyncV2.Application.Abstractions.LogLevel.Error,
             message,
             exception,
             cancellationToken);
+    }
+
+    private static string GetUserFriendlyError(Exception exception)
+    {
+        return exception switch
+        {
+            IOException => exception.Message,
+            UnauthorizedAccessException => exception.Message,
+            _ => $"{exception.GetType().Name}: {exception.Message}"
+        };
     }
 }

@@ -2,7 +2,7 @@
 
 namespace OneWaySyncV2.Infrastructure.FileSystem;
 
-public sealed class LocalFileSystem : IFileSystem
+public sealed class LocalFileSystem(ISyncLogger logger) : IFileSystem
 {
     public bool DirectoryExists(string path)
     {
@@ -14,28 +14,49 @@ public sealed class LocalFileSystem : IFileSystem
         Directory.CreateDirectory(path);
     }
 
-    public Task<IReadOnlyCollection<DirectoryItem>> GetDirectoriesAsync(
-    string rootPath,
-    CancellationToken cancellationToken)
+    public async Task<IReadOnlyCollection<DirectoryItem>> GetDirectoriesAsync(
+        string rootPath,
+        CancellationToken cancellationToken)
     {
-        if (!Directory.Exists(rootPath))
-            return Task.FromResult<IReadOnlyCollection<DirectoryItem>>([]);
-
         var directories = new List<DirectoryItem>();
 
-        foreach (var directoryPath in Directory.EnumerateDirectories(
-                     rootPath,
-                     "*",
-                     SearchOption.AllDirectories))
+        if (!Directory.Exists(rootPath))
+            return directories;
+
+        var directoriesToProcess = new Stack<string>();
+        directoriesToProcess.Push(rootPath);
+
+        while (directoriesToProcess.Count > 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            directories.Add(new DirectoryItem(
-                FullPath: directoryPath,
-                RelativePath: Path.GetRelativePath(rootPath, directoryPath)));
+            var currentDirectory = directoriesToProcess.Pop();
+
+            foreach (var directoryPath in await EnumerateDirectoriesSafeAsync(
+                         currentDirectory,
+                         cancellationToken))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
+                {
+                    directories.Add(new DirectoryItem(
+                        FullPath: directoryPath,
+                        RelativePath: Path.GetRelativePath(rootPath, directoryPath)));
+
+                    directoriesToProcess.Push(directoryPath);
+                }
+                catch (Exception ex) when (IsRecoverableFileSystemException(ex))
+                {
+                    await logger.ErrorAsync(
+                        $"Failed to read directory metadata: {directoryPath}",
+                        ex,
+                        cancellationToken);
+                }
+            }
         }
 
-        return Task.FromResult<IReadOnlyCollection<DirectoryItem>>(directories);
+        return directories;
     }
 
     public async Task<IReadOnlyCollection<FileItem>> GetFilesAsync(
@@ -44,20 +65,49 @@ public sealed class LocalFileSystem : IFileSystem
     {
         var files = new List<FileItem>();
 
-        foreach (var filePath in Directory.EnumerateFiles(
-                     rootPath,
-                     "*",
-                     SearchOption.AllDirectories))
+        if (!Directory.Exists(rootPath))
+            return files;
+
+        var directoriesToProcess = new Stack<string>();
+        directoriesToProcess.Push(rootPath);
+
+        while (directoriesToProcess.Count > 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var relativePath = Path.GetRelativePath(rootPath, filePath);
-            var metadata = GetFileMetadata(filePath);
+            var currentDirectory = directoriesToProcess.Pop();
 
-            files.Add(new FileItem(
-                FullPath: filePath,
-                RelativePath: relativePath,
-                Metadata: metadata));
+            foreach (var directory in await EnumerateDirectoriesSafeAsync(
+                         currentDirectory,
+                         cancellationToken))
+            {
+                directoriesToProcess.Push(directory);
+            }
+
+            foreach (var filePath in await EnumerateFilesSafeAsync(
+                         currentDirectory,
+                         cancellationToken))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
+                {
+                    var relativePath = Path.GetRelativePath(rootPath, filePath);
+                    var metadata = GetFileMetadata(filePath);
+
+                    files.Add(new FileItem(
+                        FullPath: filePath,
+                        RelativePath: relativePath,
+                        Metadata: metadata));
+                }
+                catch (Exception ex) when (IsRecoverableFileSystemException(ex))
+                {
+                    await logger.ErrorAsync(
+                        $"Failed to read file metadata: {filePath}",
+                        ex,
+                        cancellationToken);
+                }
+            }
         }
 
         return files;
@@ -113,5 +163,53 @@ public sealed class LocalFileSystem : IFileSystem
         return new FileMetadata(
             Length: info.Length,
             LastWriteTimeUtc: info.LastWriteTimeUtc);
+    }
+
+    private async Task<IReadOnlyCollection<string>> EnumerateDirectoriesSafeAsync(
+    string directoryPath,
+    CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Directory
+                .EnumerateDirectories(directoryPath)
+                .ToList();
+        }
+        catch (Exception ex) when (IsRecoverableFileSystemException(ex))
+        {
+            await logger.ErrorAsync(
+                $"Failed to enumerate directories in: {directoryPath}",
+                ex,
+                cancellationToken);
+
+            return [];
+        }
+    }
+
+    private async Task<IReadOnlyCollection<string>> EnumerateFilesSafeAsync(
+        string directoryPath,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Directory
+                .EnumerateFiles(directoryPath)
+                .ToList();
+        }
+        catch (Exception ex) when (IsRecoverableFileSystemException(ex))
+        {
+            await logger.ErrorAsync(
+                $"Failed to enumerate files in: {directoryPath}",
+                ex,
+                cancellationToken);
+
+            return [];
+        }
+    }
+
+    private static bool IsRecoverableFileSystemException(Exception exception)
+    {
+        return exception is IOException
+            or UnauthorizedAccessException;
     }
 }

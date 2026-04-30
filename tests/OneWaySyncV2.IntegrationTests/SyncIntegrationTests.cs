@@ -166,8 +166,8 @@ public sealed class SyncIntegrationTests
         string sourcePath,
         string replicaPath)
     {
-        var fileSystem = new LocalFileSystem();
         var logger = new TestSyncLogger();
+        var fileSystem = new LocalFileSystem(logger);
 
         fileSystem.CreateDirectory(replicaPath);
 

@@ -22,7 +22,7 @@ public sealed class SyncExecutor(
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 await logger.ErrorAsync(
-                    $"Failed to execute {operation.Type} for '{operation.RelativePath}'.",
+                    $"Skipped {operation.Type} for '{operation.RelativePath}'.",
                     ex,
                     cancellationToken);
             }
